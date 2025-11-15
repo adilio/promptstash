@@ -166,26 +166,28 @@ function FolderItem({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    onToggle();
+    navigate(`/app/f/${folder.id}`);
+  };
+
   return (
     <div>
-      <Link to={`/app/f/${folder.id}`}>
-        <Button
-          variant="ghost"
-          className="w-full justify-start"
-          onClick={(e) => {
-            e.preventDefault();
-            onToggle();
-          }}
-        >
-          {expanded ? (
-            <ChevronDown className="mr-1 h-3 w-3" />
-          ) : (
-            <ChevronRight className="mr-1 h-3 w-3" />
-          )}
-          <Folder className="mr-2 h-4 w-4" />
-          {folder.name}
-        </Button>
-      </Link>
+      <Button
+        variant="ghost"
+        className="w-full justify-start"
+        onClick={handleClick}
+      >
+        {expanded ? (
+          <ChevronDown className="mr-1 h-3 w-3" />
+        ) : (
+          <ChevronRight className="mr-1 h-3 w-3" />
+        )}
+        <Folder className="mr-2 h-4 w-4" />
+        {folder.name}
+      </Button>
     </div>
   );
 }

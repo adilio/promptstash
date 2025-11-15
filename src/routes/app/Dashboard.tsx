@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Plus, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PromptCard } from '@/components/PromptCard';
+import { PromptCardSkeleton } from '@/components/PromptCardSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { listPrompts, deletePrompt } from '@/api/prompts';
 import { useToast } from '@/components/ui/use-toast';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut';
 import type { Prompt } from '@/lib/types';
 
 interface ContextType {
@@ -20,22 +23,37 @@ export function Dashboard() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [deletePromptId, setDeletePromptId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts
+  useKeyboardShortcut({
+    key: 'n',
+    ctrlKey: true,
+    callback: () => navigate('/app/p/new'),
+  });
+
+  useKeyboardShortcut({
+    key: 'k',
+    ctrlKey: true,
+    callback: () => searchInputRef.current?.focus(),
+  });
 
   useEffect(() => {
     if (currentTeamId) {
       loadPrompts();
     }
-  }, [currentTeamId, searchQuery]);
+  }, [currentTeamId, debouncedSearchQuery]);
 
   const loadPrompts = async () => {
     if (!currentTeamId) return;
 
     setLoading(true);
     try {
-      const data = await listPrompts(currentTeamId, undefined, searchQuery);
+      const data = await listPrompts(currentTeamId, undefined, debouncedSearchQuery);
       setPrompts(data);
     } catch (error: any) {
       toast({
@@ -69,10 +87,6 @@ export function Dashboard() {
     }
   };
 
-  if (loading) {
-    return <Loading />;
-  }
-
   return (
     <div className="h-full flex flex-col">
       <div className="border-b bg-muted/40 px-6 py-4">
@@ -90,7 +104,8 @@ export function Dashboard() {
         </div>
         <div className="mt-4">
           <Input
-            placeholder="Search prompts..."
+            ref={searchInputRef}
+            placeholder="Search prompts... (Ctrl+K)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -98,7 +113,13 @@ export function Dashboard() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        {prompts.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <PromptCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : prompts.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="No prompts yet"

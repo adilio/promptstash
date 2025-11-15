@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { MarkdownViewer } from '@/components/MarkdownViewer';
 import { Loading } from '@/components/Loading';
 import { getPrompt, createPrompt, updatePrompt } from '@/api/prompts';
 import { useToast } from '@/components/ui/use-toast';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface ContextType {
   currentTeamId?: string;
@@ -20,18 +21,68 @@ export function PromptEditor() {
   const { currentTeamId } = useOutletContext<ContextType>();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const initialLoadRef = useRef(true);
 
   const isNew = promptId === 'new';
+  const debouncedTitle = useDebounce(title, 2000);
+  const debouncedBody = useDebounce(body, 2000);
 
   useEffect(() => {
     if (promptId && !isNew) {
       loadPrompt();
     }
-  }, [promptId]);
+    if (currentTeamId) {
+      loadTags();
+    }
+  }, [promptId, currentTeamId]);
+
+  const loadTags = async () => {
+    if (!currentTeamId) return;
+
+    try {
+      const tags = await listTags(currentTeamId);
+      setAvailableTags(tags);
+    } catch (error) {
+      console.error('Failed to load tags:', error);
+    }
+  };
+
+  // Autosave effect
+  useEffect(() => {
+    const autoSave = async () => {
+      // Skip autosave on initial load or for new prompts
+      if (initialLoadRef.current || isNew || !title.trim()) {
+        initialLoadRef.current = false;
+        return;
+      }
+
+      setAutoSaving(true);
+      try {
+        await updatePrompt(promptId!, {
+          title: debouncedTitle,
+          body_md: debouncedBody,
+        });
+        setLastSaved(new Date());
+      } catch (error) {
+        // Silent fail for autosave
+        console.error('Autosave failed:', error);
+      } finally {
+        setAutoSaving(false);
+      }
+    };
+
+    if (!isNew && promptId) {
+      autoSave();
+    }
+  }, [debouncedTitle, debouncedBody]);
 
   const loadPrompt = async () => {
     if (!promptId || isNew) return;
@@ -41,6 +92,7 @@ export function PromptEditor() {
       const data = await getPrompt(promptId);
       setTitle(data.title);
       setBody(data.body_md);
+      setSelectedTags(data.tags || []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -50,6 +102,48 @@ export function PromptEditor() {
       navigate('/app');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateTag = async (name: string): Promise<Tag> => {
+    if (!currentTeamId) throw new Error('No team selected');
+
+    const newTag = await createTag({
+      team_id: currentTeamId,
+      name,
+    });
+
+    setAvailableTags([...availableTags, newTag]);
+    return newTag;
+  };
+
+  const handleTagsChange = async (tags: Tag[]) => {
+    const prevTags = selectedTags;
+    setSelectedTags(tags);
+
+    // Only sync tags if editing existing prompt
+    if (!isNew && promptId) {
+      try {
+        // Find added tags
+        const addedTags = tags.filter((t) => !prevTags.find((p) => p.id === t.id));
+        for (const tag of addedTags) {
+          await addTagToPrompt(promptId, tag.id);
+        }
+
+        // Find removed tags
+        const removedTags = prevTags.filter((p) => !tags.find((t) => t.id === p.id));
+        for (const tag of removedTags) {
+          await removeTagFromPrompt(promptId, tag.id);
+        }
+      } catch (error) {
+        // Revert on error
+        setSelectedTags(prevTags);
+        toast({
+          title: 'Error',
+          description: 'Failed to update tags',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -123,7 +217,18 @@ export function PromptEditor() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl font-bold">{isNew ? 'New Prompt' : 'Edit Prompt'}</h1>
+            <div>
+              <h1 className="text-2xl font-bold">{isNew ? 'New Prompt' : 'Edit Prompt'}</h1>
+              {!isNew && (
+                <p className="text-xs text-muted-foreground">
+                  {autoSaving
+                    ? 'Saving...'
+                    : lastSaved
+                    ? `Last saved ${lastSaved.toLocaleTimeString()}`
+                    : ''}
+                </p>
+              )}
+            </div>
           </div>
           <Button onClick={handleSave} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />
@@ -144,6 +249,13 @@ export function PromptEditor() {
               maxLength={140}
             />
           </div>
+
+          <TagInput
+            availableTags={availableTags}
+            selectedTags={selectedTags}
+            onTagsChange={handleTagsChange}
+            onCreateTag={handleCreateTag}
+          />
 
           <Tabs defaultValue="edit" className="flex-1">
             <TabsList>
