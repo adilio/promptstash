@@ -8,9 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { MarkdownViewer } from '@/components/MarkdownViewer';
 import { Loading } from '@/components/Loading';
+import { TagInput } from '@/components/TagInput';
 import { getPrompt, createPrompt, updatePrompt } from '@/api/prompts';
+import { listTags, createTag, addTagToPrompt, removeTagFromPrompt } from '@/api/tags';
 import { useToast } from '@/components/ui/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut';
+import type { Tag } from '@/lib/types';
 
 interface ContextType {
   currentTeamId?: string;
@@ -200,6 +204,13 @@ export function PromptEditor() {
       setSaving(false);
     }
   };
+
+  // Keyboard shortcut for save
+  useKeyboardShortcut({
+    key: 's',
+    ctrlKey: true,
+    callback: handleSave,
+  });
 
   if (loading) {
     return <Loading />;
