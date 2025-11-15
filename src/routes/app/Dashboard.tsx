@@ -1,34 +1,82 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Plus, FileText } from 'lucide-react';
+import { Plus, FileText, Filter, X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PromptCard } from '@/components/PromptCard';
 import { PromptCardSkeleton } from '@/components/PromptCardSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { listPrompts, deletePrompt } from '@/api/prompts';
+import { DragAndDropHelp } from '@/components/DragAndDropHelp';
+import { ExportImportDialog } from '@/components/ExportImportDialog';
+import { listPrompts, deletePrompt, updatePrompt } from '@/api/prompts';
+import { listFolders } from '@/api/folders';
+import { listTags } from '@/api/tags';
 import { useToast } from '@/components/ui/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut';
-import type { Prompt } from '@/lib/types';
+import { useDragPreview } from '@/hooks/useDragPreview';
+import type { Prompt, Folder, Tag } from '@/lib/types';
 
 interface ContextType {
   currentTeamId?: string;
+  setFolderDropHandler?: (handler: ((folderId: string | null) => void) | undefined) => void;
 }
 
 export function Dashboard() {
-  const { currentTeamId } = useOutletContext<ContextType>();
+  const { currentTeamId, setFolderDropHandler } = useOutletContext<ContextType>();
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [deletePromptId, setDeletePromptId] = useState<string | null>(null);
+
+  // Bulk operations state
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedPrompts, setSelectedPrompts] = useState<Set<string>>(new Set());
+
+  // Drag and drop state
+  const [draggedPrompt, setDraggedPrompt] = useState<Prompt | null>(null);
+  const [showDropZones, setShowDropZones] = useState(false);
+  const [dropZoneHover, setDropZoneHover] = useState<string | null>(null);
+
+  // Filter state
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { showPreview, hidePreview, updatePreviewPosition } = useDragPreview();
+
+  // Filter prompts based on selected folder and tags
+  const filteredPrompts = useMemo(() => {
+    return prompts.filter((prompt) => {
+      // Folder filter
+      if (selectedFolder !== null && prompt.folder_id !== selectedFolder) {
+        return false;
+      }
+
+      // Tag filter (client-side)
+      if (selectedTags.length > 0) {
+        const promptTagIds = prompt.tags?.map((t) => t.id) || [];
+        const hasAllSelectedTags = selectedTags.every((tagId) =>
+          promptTagIds.includes(tagId)
+        );
+        if (!hasAllSelectedTags) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [prompts, selectedFolder, selectedTags]);
 
   // Keyboard shortcuts
   useKeyboardShortcut({
@@ -49,6 +97,13 @@ export function Dashboard() {
     }
   }, [currentTeamId, debouncedSearchQuery]);
 
+  useEffect(() => {
+    if (currentTeamId) {
+      loadFolders();
+      loadTags();
+    }
+  }, [currentTeamId]);
+
   const loadPrompts = async () => {
     if (!currentTeamId) return;
 
@@ -64,6 +119,36 @@ export function Dashboard() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadFolders = async () => {
+    if (!currentTeamId) return;
+
+    try {
+      const data = await listFolders(currentTeamId);
+      setFolders(data);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const loadTags = async () => {
+    if (!currentTeamId) return;
+
+    try {
+      const data = await listTags(currentTeamId);
+      setAvailableTags(data);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -101,10 +186,10 @@ export function Dashboard() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedPrompts.size === prompts.length) {
+    if (selectedPrompts.size === filteredPrompts.length) {
       setSelectedPrompts(new Set());
     } else {
-      setSelectedPrompts(new Set(prompts.map((p) => p.id)));
+      setSelectedPrompts(new Set(filteredPrompts.map((p) => p.id)));
     }
   };
 
@@ -190,6 +275,18 @@ export function Dashboard() {
       handleDragEnd();
     }
   };
+
+  // Register folder drop handler for sidebar
+  useEffect(() => {
+    if (setFolderDropHandler) {
+      setFolderDropHandler(handleDrop);
+    }
+    return () => {
+      if (setFolderDropHandler) {
+        setFolderDropHandler(undefined);
+      }
+    };
+  }, [setFolderDropHandler, draggedPrompt, folders]);
 
   return (
     <div className="h-full flex flex-col">
@@ -323,7 +420,7 @@ export function Dashboard() {
               <PromptCardSkeleton key={i} />
             ))}
           </div>
-        ) : prompts.length === 0 ? (
+        ) : filteredPrompts.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="No prompts yet"
@@ -338,16 +435,16 @@ export function Dashboard() {
             {bulkMode && (
               <div className="mb-4 flex items-center gap-2">
                 <Checkbox
-                  checked={selectedPrompts.size === prompts.length}
+                  checked={selectedPrompts.size === filteredPrompts.length}
                   onCheckedChange={toggleSelectAll}
                 />
                 <span className="text-sm text-muted-foreground">
-                  {selectedPrompts.size === prompts.length ? 'Deselect' : 'Select'} all
+                  {selectedPrompts.size === filteredPrompts.length ? 'Deselect' : 'Select'} all
                 </span>
               </div>
             )}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {prompts.map((prompt) => (
+              {filteredPrompts.map((prompt) => (
                 <div key={prompt.id} className="relative">
                   {bulkMode && (
                     <div className="absolute top-2 left-2 z-10">
