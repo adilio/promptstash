@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Share2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, Share2, Trash2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MarkdownViewer } from '@/components/MarkdownViewer';
 import { ShareDialog } from '@/components/ShareDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { VersionHistoryDialog } from '@/components/VersionHistoryDialog';
 import { Loading } from '@/components/Loading';
 import { getPrompt, deletePrompt } from '@/api/prompts';
 import { useToast } from '@/components/ui/use-toast';
@@ -16,6 +17,7 @@ export function PromptView() {
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -87,6 +89,10 @@ export function PromptView() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setVersionHistoryOpen(true)}>
+              <History className="mr-2 h-4 w-4" />
+              History
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShareOpen(true)}>
               <Share2 className="mr-2 h-4 w-4" />
               Share
@@ -114,12 +120,20 @@ export function PromptView() {
       </div>
 
       {prompt && (
-        <ShareDialog
-          prompt={prompt}
-          open={shareOpen}
-          onOpenChange={setShareOpen}
-          onUpdate={setPrompt}
-        />
+        <>
+          <ShareDialog
+            prompt={prompt}
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            onUpdate={setPrompt}
+          />
+          <VersionHistoryDialog
+            promptId={promptId!}
+            open={versionHistoryOpen}
+            onOpenChange={setVersionHistoryOpen}
+            onRestore={loadPrompt}
+          />
+        </>
       )}
 
       <ConfirmDialog

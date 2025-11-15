@@ -8,6 +8,7 @@ import { Loading } from '@/components/Loading';
 export function AppLayout() {
   const [loading, setLoading] = useState(true);
   const [currentTeamId, setCurrentTeamId] = useState<string>();
+  const [folderDropHandler, setFolderDropHandler] = useState<((folderId: string | null) => void) | undefined>();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,9 +39,13 @@ export function AppLayout() {
 
   return (
     <Shell>
-      <Sidebar currentTeamId={currentTeamId} onTeamChange={setCurrentTeamId} />
+      <Sidebar
+        currentTeamId={currentTeamId}
+        onTeamChange={setCurrentTeamId}
+        onFolderDrop={folderDropHandler}
+      />
       <main className="flex-1 overflow-auto">
-        <Outlet context={{ currentTeamId }} />
+        <Outlet context={{ currentTeamId, setFolderDropHandler }} />
       </main>
     </Shell>
   );

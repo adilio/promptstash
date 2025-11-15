@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
+import { ThemeToggle } from './ThemeToggle';
 import { supabase } from '@/lib/supabase';
 import { listTeams } from '@/api/teams';
 import { listFolders } from '@/api/folders';
@@ -26,12 +27,14 @@ import {
 interface SidebarProps {
   currentTeamId?: string;
   onTeamChange?: (teamId: string) => void;
+  onFolderDrop?: (folderId: string | null) => void;
 }
 
-export function Sidebar({ currentTeamId, onTeamChange }: SidebarProps) {
+export function Sidebar({ currentTeamId, onTeamChange, onFolderDrop }: SidebarProps) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [dropTargetFolder, setDropTargetFolder] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -86,8 +89,9 @@ export function Sidebar({ currentTeamId, onTeamChange }: SidebarProps) {
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-muted/40">
-      <div className="border-b p-4">
+      <div className="border-b p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">PromptStash</h1>
+        <ThemeToggle />
       </div>
 
       <div className="border-b p-4">
@@ -130,6 +134,10 @@ export function Sidebar({ currentTeamId, onTeamChange }: SidebarProps) {
                   folder={folder}
                   expanded={expandedFolders.has(folder.id)}
                   onToggle={() => toggleFolder(folder.id)}
+                  isDropTarget={dropTargetFolder === folder.id}
+                  onDrop={onFolderDrop}
+                  onDragOver={() => setDropTargetFolder(folder.id)}
+                  onDragLeave={() => setDropTargetFolder(null)}
                 />
               ))}
             </div>
@@ -161,31 +169,66 @@ function FolderItem({
   folder,
   expanded,
   onToggle,
+  isDropTarget = false,
+  onDrop,
+  onDragOver,
+  onDragLeave,
 }: {
   folder: FolderType;
   expanded: boolean;
   onToggle: () => void;
+  isDropTarget?: boolean;
+  onDrop?: (folderId: string | null) => void;
+  onDragOver?: () => void;
+  onDragLeave?: () => void;
 }) {
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    onToggle();
+    navigate(`/app/f/${folder.id}`);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDrop?.(folder.id);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragOver?.();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragLeave?.();
+  };
+
   return (
-    <div>
-      <Link to={`/app/f/${folder.id}`}>
-        <Button
-          variant="ghost"
-          className="w-full justify-start"
-          onClick={(e) => {
-            e.preventDefault();
-            onToggle();
-          }}
-        >
-          {expanded ? (
-            <ChevronDown className="mr-1 h-3 w-3" />
-          ) : (
-            <ChevronRight className="mr-1 h-3 w-3" />
-          )}
-          <Folder className="mr-2 h-4 w-4" />
-          {folder.name}
-        </Button>
-      </Link>
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      className={`rounded-md transition-colors ${
+        isDropTarget ? 'bg-primary/10 ring-2 ring-primary' : ''
+      }`}
+    >
+      <Button
+        variant="ghost"
+        className="w-full justify-start"
+        onClick={handleClick}
+      >
+        {expanded ? (
+          <ChevronDown className="mr-1 h-3 w-3" />
+        ) : (
+          <ChevronRight className="mr-1 h-3 w-3" />
+        )}
+        <Folder className={`mr-2 h-4 w-4 ${isDropTarget ? 'text-primary' : ''}`} />
+        {folder.name}
+      </Button>
     </div>
   );
 }
