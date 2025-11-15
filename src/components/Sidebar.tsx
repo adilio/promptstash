@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
+import { ThemeToggle } from './ThemeToggle';
 import { supabase } from '@/lib/supabase';
 import { listTeams } from '@/api/teams';
 import { listFolders } from '@/api/folders';
@@ -86,8 +87,9 @@ export function Sidebar({ currentTeamId, onTeamChange }: SidebarProps) {
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-muted/40">
-      <div className="border-b p-4">
+      <div className="border-b p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">PromptStash</h1>
+        <ThemeToggle />
       </div>
 
       <div className="border-b p-4">
