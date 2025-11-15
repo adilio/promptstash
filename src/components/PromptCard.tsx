@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FileText, MoreVertical, Trash2, Edit, Globe } from 'lucide-react';
+import { FileText, MoreVertical, Trash2, Edit, Globe, GripVertical } from 'lucide-react';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Button } from './ui/button';
 import {
@@ -14,13 +14,25 @@ interface PromptCardProps {
   prompt: Prompt;
   onEdit?: (prompt: Prompt) => void;
   onDelete?: (prompt: Prompt) => void;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent, prompt: Prompt) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  isDragging?: boolean;
 }
 
 export function PromptCard({ prompt, onEdit, onDelete, draggable = false, onDragStart, onDragEnd, isDragging = false }: PromptCardProps) {
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card
+      className={`hover:shadow-md transition-all ${isDragging ? 'opacity-50 cursor-grabbing' : ''} ${draggable ? 'cursor-grab' : ''}`}
+      draggable={draggable}
+      onDragStart={(e) => onDragStart?.(e, prompt)}
+      onDragEnd={onDragEnd}
+    >
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="flex items-start gap-2 flex-1">
+          {draggable && (
+            <GripVertical className="h-4 w-4 mt-0.5 text-muted-foreground cursor-grab" />
+          )}
           <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <div className="flex-1 min-w-0">
             <Link to={`/app/p/${prompt.id}`}>
