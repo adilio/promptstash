@@ -9,7 +9,7 @@ PromptStash has been transformed from a solid MVP into a **production-ready, fea
 ## 📊 Overall Statistics
 
 ### Code Changes
-- **Total Commits:** 4
+- **Total Commits:** 7
 - **Files Modified:** 46
 - **Lines Added:** ~4,500
 - **Features Added:** 19 major features
@@ -547,10 +547,48 @@ The codebase is **maintainable**, **tested**, **documented**, and **ready to shi
 
 **Branch:** `claude/codebase-review-016jNrer8j1RcBRUJfMmSq5a`
 
-**Total Commits:** 4
+**Total Commits:** 7
 1. Core improvements + full test coverage
 2. Advanced features (Dark Mode, Version History, Search, Bulk Ops, Export/Import)
 3. Comprehensive documentation
 4. Drag-and-drop organization
+5. Final summary documentation
+6. Fix Dashboard implementation (missing imports, state, filtering logic)
+7. Add complete drag-and-drop support to PromptCard
 
 **All changes committed and pushed!** ✅
+
+---
+
+## 🔧 Session 2 Fixes (Latest)
+
+After the initial implementation, the following critical fixes were applied:
+
+### Dashboard.tsx - Complete Implementation
+**Issue:** Dashboard had incomplete implementation with missing imports and state
+**Fixes Applied:**
+- ✅ Added all missing imports (Filter, X, Trash2, Badge, Checkbox, DragAndDropHelp, ExportImportDialog, updatePrompt, listFolders, listTags, useDragPreview)
+- ✅ Added missing state declarations for bulk operations, drag-and-drop, and filtering
+- ✅ Implemented loadFolders() and loadTags() functions
+- ✅ Added filteredPrompts with useMemo for efficient folder and tag filtering
+- ✅ Updated render to use filteredPrompts instead of prompts
+- ✅ Wired up drag-and-drop between Dashboard and Sidebar through AppLayout
+
+### AppLayout.tsx - Drag-and-Drop Coordination
+**Issue:** No coordination between Dashboard (source) and Sidebar (target) for drag-and-drop
+**Fixes Applied:**
+- ✅ Added folderDropHandler state to coordinate drag-and-drop
+- ✅ Added setFolderDropHandler to Outlet context
+- ✅ Passed onFolderDrop to Sidebar component
+
+### PromptCard.tsx - Draggable Support
+**Issue:** Component had props in function signature but missing from interface and implementation
+**Fixes Applied:**
+- ✅ Added drag-and-drop props to interface (draggable, onDragStart, onDragEnd, isDragging)
+- ✅ Added GripVertical icon import
+- ✅ Applied draggable attribute and drag event handlers to Card
+- ✅ Added visual feedback (opacity-50, cursor-grabbing) when dragging
+- ✅ Conditionally show GripVertical icon when draggable
+- ✅ Added cursor-grab style for better UX
+
+**Impact:** These fixes ensure the drag-and-drop functionality works end-to-end across Dashboard and Sidebar with proper visual feedback.
