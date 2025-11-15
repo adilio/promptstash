@@ -28,6 +28,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { showPreview, hidePreview, updatePreviewPosition } = useDragPreview();
 
   // Keyboard shortcuts
   useKeyboardShortcut({
@@ -130,15 +131,78 @@ export function Dashboard() {
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, prompt: Prompt) => {
+    setDraggedPrompt(prompt);
+    setShowDropZones(true);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', prompt.id);
+
+    // Show custom drag preview
+    showPreview({ text: `Moving: ${prompt.title}` });
+
+    // Track mouse position for custom preview
+    const handleMouseMove = (e: MouseEvent) => {
+      updatePreviewPosition(e.clientX, e.clientY);
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+
+    // Clean up on drag end
+    const cleanup = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('dragend', cleanup);
+    };
+    document.addEventListener('dragend', cleanup);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPrompt(null);
+    setShowDropZones(false);
+    setDropZoneHover(null);
+    hidePreview();
+  };
+
+  const handleDrop = async (folderId: string | null) => {
+    if (!draggedPrompt) return;
+
+    try {
+      await updatePrompt(draggedPrompt.id, {
+        folder_id: folderId,
+      });
+
+      // Update local state
+      setPrompts((prev) =>
+        prev.map((p) =>
+          p.id === draggedPrompt.id ? { ...p, folder_id: folderId } : p
+        )
+      );
+
+      toast({
+        title: 'Success',
+        description: `Moved to ${folderId ? folders.find(f => f.id === folderId)?.name : 'root'}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      handleDragEnd();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="border-b bg-muted/40 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              Manage your prompts and organize them into folders
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                Manage your prompts and organize them into folders
+              </p>
+              <DragAndDropHelp />
+            </div>
           </div>
           <div className="flex gap-2">
             {bulkMode && selectedPrompts.size > 0 && (
@@ -298,6 +362,10 @@ export function Dashboard() {
                     prompt={prompt}
                     onEdit={(p) => navigate(`/app/p/${p.id}/edit`)}
                     onDelete={(p) => setDeletePromptId(p.id)}
+                    draggable={!bulkMode}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    isDragging={draggedPrompt?.id === prompt.id}
                   />
                 </div>
               ))}

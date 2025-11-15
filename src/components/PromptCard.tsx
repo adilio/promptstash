@@ -16,7 +16,7 @@ interface PromptCardProps {
   onDelete?: (prompt: Prompt) => void;
 }
 
-export function PromptCard({ prompt, onEdit, onDelete }: PromptCardProps) {
+export function PromptCard({ prompt, onEdit, onDelete, draggable = false, onDragStart, onDragEnd, isDragging = false }: PromptCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">

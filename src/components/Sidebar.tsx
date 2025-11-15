@@ -27,12 +27,14 @@ import {
 interface SidebarProps {
   currentTeamId?: string;
   onTeamChange?: (teamId: string) => void;
+  onFolderDrop?: (folderId: string | null) => void;
 }
 
-export function Sidebar({ currentTeamId, onTeamChange }: SidebarProps) {
+export function Sidebar({ currentTeamId, onTeamChange, onFolderDrop }: SidebarProps) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [dropTargetFolder, setDropTargetFolder] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -132,6 +134,10 @@ export function Sidebar({ currentTeamId, onTeamChange }: SidebarProps) {
                   folder={folder}
                   expanded={expandedFolders.has(folder.id)}
                   onToggle={() => toggleFolder(folder.id)}
+                  isDropTarget={dropTargetFolder === folder.id}
+                  onDrop={onFolderDrop}
+                  onDragOver={() => setDropTargetFolder(folder.id)}
+                  onDragLeave={() => setDropTargetFolder(null)}
                 />
               ))}
             </div>
@@ -163,10 +169,18 @@ function FolderItem({
   folder,
   expanded,
   onToggle,
+  isDropTarget = false,
+  onDrop,
+  onDragOver,
+  onDragLeave,
 }: {
   folder: FolderType;
   expanded: boolean;
   onToggle: () => void;
+  isDropTarget?: boolean;
+  onDrop?: (folderId: string | null) => void;
+  onDragOver?: () => void;
+  onDragLeave?: () => void;
 }) {
   const navigate = useNavigate();
 
@@ -175,8 +189,33 @@ function FolderItem({
     navigate(`/app/f/${folder.id}`);
   };
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDrop?.(folder.id);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragOver?.();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragLeave?.();
+  };
+
   return (
-    <div>
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      className={`rounded-md transition-colors ${
+        isDropTarget ? 'bg-primary/10 ring-2 ring-primary' : ''
+      }`}
+    >
       <Button
         variant="ghost"
         className="w-full justify-start"
@@ -187,7 +226,7 @@ function FolderItem({
         ) : (
           <ChevronRight className="mr-1 h-3 w-3" />
         )}
-        <Folder className="mr-2 h-4 w-4" />
+        <Folder className={`mr-2 h-4 w-4 ${isDropTarget ? 'text-primary' : ''}`} />
         {folder.name}
       </Button>
     </div>
